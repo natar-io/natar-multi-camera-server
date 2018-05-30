@@ -23,19 +23,24 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 import tech.lity.rea.nectar.camera.CameraFactory;
+import org.redisson.Redisson;
+import org.redisson.api.RBinaryStream;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
+import org.redisson.client.codec.*;
+import org.redisson.config.TransportMode;
 
 /**
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
  */
-public class CameraServer extends Thread {
+public class CameraServerRedisson extends Thread {
 
-    Jedis redis;
     Camera camera;
 
     boolean running = true;
 
-    public CameraServer(String[] args) {
+    public CameraServerRedisson(String[] args) {
         connectRedist();
 
         try {
@@ -49,9 +54,10 @@ public class CameraServer extends Thread {
 //            camera.setParent(applet);
 //            camera.setCalibration(cameraCalib);
         } catch (CannotCreateCameraException ex) {
-            Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(CameraServerRedisson.class.getName()).log(Level.SEVERE, null, ex);
         }
 
+//        papart.startTracking();
 //        papart.startTracking();
     }
 
@@ -77,14 +83,26 @@ public class CameraServer extends Thread {
             }
 
         } catch (ParseException ex) {
-            Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(CameraServerRedisson.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
+    RedissonClient redisson;
 
     private void connectRedist() {
         try {
-            redis = new Jedis("127.0.0.1", 6379);
-            if (redis == null) {
+            Config config = new Config();
+
+            ByteArrayCodec codec = org.redisson.client.codec.ByteArrayCodec.INSTANCE;
+            config.setTransportMode(TransportMode.EPOLL);
+            config.useSingleServer().setAddress("redis://127.0.0.1:6379");
+//        config.useClusterServers()
+//                // use "rediss://" for SSL connection
+//                .addNodeAddress("redis://127.0.0.1:6379");
+            config.setCodec(codec);
+//        
+            redisson = Redisson.create(config);
+
+            if (redisson == null) {
                 throw new Exception("Cannot connect to server. ");
             }
         } catch (Exception e) {
@@ -109,7 +127,6 @@ public class CameraServer extends Thread {
         imageData = new byte[nChannels * width * height * bytePerChannel];
     }
 
-    int lastTime = 0;
     public void sendImage() {
 
         if (camera != null) {
@@ -138,7 +155,11 @@ public class CameraServer extends Thread {
 
                 System.out.println("Redis set image. " + name);
 //                redis.set(id, yourBytes);
-                redis.publish(id, yourBytes);
+//                redis.publish(id, yourBytes);
+                
+                RBinaryStream binaryStream = redisson.getBinaryStream(name);
+                binaryStream.set(imageData);
+                
             } catch (ConnectException e) {
                 e.printStackTrace();
                 System.exit(-1);
@@ -163,7 +184,7 @@ public class CameraServer extends Thread {
      */
     static public void main(String[] passedArgs) {
 
-        CameraServer cameraServer = new CameraServer(passedArgs);
+        CameraServerRedisson cameraServer = new CameraServerRedisson(passedArgs);
         cameraServer.start();
     }
 
