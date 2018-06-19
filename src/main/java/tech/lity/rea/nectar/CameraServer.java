@@ -1,5 +1,6 @@
 package tech.lity.rea.nectar;
 
+import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 import processing.core.*;
 import tech.lity.rea.nectar.camera.Camera;
 import tech.lity.rea.nectar.camera.CannotCreateCameraException;
@@ -20,6 +21,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.Option.Builder;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 import tech.lity.rea.nectar.camera.CameraFactory;
@@ -30,60 +32,156 @@ import tech.lity.rea.nectar.camera.CameraFactory;
  */
 public class CameraServer extends Thread {
 
-    Jedis redis;
+    Jedis redis, redisSend;
     Camera camera;
+
+    // Arguments
+    public static final int REDIS_PORT = 6379;
+    public static final String REDIS_HOST = "localhost";
+
+    private String driverName = "";
+    private String description = "0";
+    private String format = "";
+    private int width = 640, height = 480;
+    private String markerFileName = "";
+    private String input = "marker";
+    private String output = "pose";
+    private String host = REDIS_HOST;
+    private int port = REDIS_PORT;
+    private boolean isUnique = false;
+    private Camera.Type type;
 
     boolean running = true;
 
+    boolean isVerbose = false;
+    boolean isSilent = false;
+
     public CameraServer(String[] args) {
+        checkArguments(args);
         connectRedist();
 
         try {
             // application only using a camera
             // screen rendering
 //            camera = CameraFactory.createCamera(Camera.Type.OPENCV, "0", "");
-            camera = CameraFactory.createCamera(Camera.Type.OPENNI2, "0", "rgb");
-            camera.setSize(640, 480);
+            camera = CameraFactory.createCamera(type, description, format);
+            camera.setSize(width, height);
             camera.start();
-            initMemory(640, 480, 3, 1);
+            sendParams(camera);
+            initMemory(width, height, 3, 1);
+
 //            camera.setParent(applet);
 //            camera.setCalibration(cameraCalib);
         } catch (CannotCreateCameraException ex) {
             Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+            die(ex.toString());
         }
 
 //        papart.startTracking();
     }
 
-    protected void checkArguments(String[] passedArgs) {
-        Options options = new Options();
-//         options.addOption("i", "input", true, "Input line in Redis if any.");
-        options.addOption("o", "output", true, "Output line in Redis if any, default is:" + defaultName);
+    private Options options;
+
+    private String buildDriverNames() {
+        Camera.Type[] values = Camera.Type.values();
+        StringBuilder driversText = new StringBuilder();
+        for (int i = 0; i < values.length; i++) {
+            driversText.append(values[i]);
+            if (i != values.length - 1) {
+                driversText.append(", ");
+            }
+        }
+        return driversText.toString();
+    }
+
+    private void checkArguments(String[] passedArgs) {
+        options = new Options();
+
+//        public static Camera createCamera(Camera.Type type, String description, String format)
+//        options.addRequiredOption("i", "input", true, "Input key of marker locations.");
+        options.addRequiredOption("d", "driver", true, "Driver to use amongst: " + buildDriverNames());
+        options.addRequiredOption("id", "device-id", true, "Device id, path or name (driver dependant).");
+        options.addOption("f", "format", true, "Format, e.g.: for depth cameras rgb, ir, depth.");
+        options.addOption("w", "width", true, "Image width, default 640.");
+        options.addOption("h", "height", true, "Image height, default 480.");
+        options.addOption("r", "resolution", true, "Image size, can be used instead of width and height, default 640x480.");
+        // Generic options
+        options.addOption("h", "help", false, "print this help.");
+        options.addOption("v", "verbose", false, "Verbose activated.");
+        options.addOption("s", "silent", false, "Silent activated.");
+        options.addOption("u", "unique", false, "Unique mode, run only once and use get/set instead of pub/sub");
+        options.addRequiredOption("o", "output", true, "Output key.");
         options.addOption("rp", "redisport", true, "Redis port, default is: " + REDIS_PORT);
-        options.addOption("rh", "redishost", true, "Redis host, default is: 127.0.0.1");
-        options.addOption("h", "host", true, "this computer's name.");
+        options.addOption("rh", "redishost", true, "Redis host, default is: " + REDIS_HOST);
 
         CommandLineParser parser = new DefaultParser();
+        CommandLine cmd;
+
+        // -u -i markers -cc data/calibration-AstraS-rgb.yaml -mc data/A4-default.svg -o pose
         try {
-            CommandLine cmd = parser.parse(options, passedArgs);
+            cmd = parser.parse(options, passedArgs);
 
-            if (cmd.hasOption("o")) {
-                String output = cmd.getOptionValue("o");
-
-                System.out.println("Output: " + output);
-            } else {
-                System.out.println("No output value"); // print the date
-                System.out.println("Default output: " + defaultName); // print the date
+            if (cmd.hasOption("d")) {
+                driverName = cmd.getOptionValue("d");
+                type = Camera.Type.valueOf(driverName);
+                // TODO: CHECK TYPE PROBLEM
+            }
+            if (cmd.hasOption("id")) {
+                description = cmd.getOptionValue("id");
             }
 
+            if (cmd.hasOption("f")) {
+                format = cmd.getOptionValue("f");
+            }
+            if (cmd.hasOption("r")) {
+                String resolution = cmd.getOptionValue("r");
+                String[] split = resolution.split("x");
+                width = Integer.parseInt(split[0]);
+                height = Integer.parseInt(split[1]);
+            }
+
+            if (cmd.hasOption("w")) {
+                width = Integer.parseInt(cmd.getOptionValue("w"));
+            }
+            if (cmd.hasOption("h")) {
+                height = Integer.parseInt(cmd.getOptionValue("h"));
+            }
+
+            if (cmd.hasOption("h")) {
+                die("", true);
+            }
+
+            if (cmd.hasOption("o")) {
+                output = cmd.getOptionValue("o");
+            } else {
+                die("Please set an output key with -o or --output ", true);
+            }
+
+            if (cmd.hasOption("u")) {
+                isUnique = true;
+            }
+            if (cmd.hasOption("v")) {
+                isVerbose = true;
+            }
+            if (cmd.hasOption("s")) {
+                isSilent = true;
+            }
+            if (cmd.hasOption("rh")) {
+                host = cmd.getOptionValue("rh");
+            }
+            if (cmd.hasOption("rp")) {
+                port = Integer.parseInt(cmd.getOptionValue("rp"));
+            }
         } catch (ParseException ex) {
-            Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+            die(ex.toString(), true);
+//            Logger.getLogger(PoseEstimator.class.getName()).log(Level.SEVERE, null, ex);
         }
+
     }
 
     private void connectRedist() {
         try {
-            redis = new Jedis("127.0.0.1", 6379);
+            redis = new Jedis(host, port);
             if (redis == null) {
                 throw new Exception("Cannot connect to server. ");
             }
@@ -92,6 +190,12 @@ public class CameraServer extends Thread {
             System.exit(0);
         }
         // redis.auth("156;2Asatu:AUI?S2T51235AUEAIU");
+    }
+
+    private void sendParams(Camera cam) {
+        redis.set(output + ":width",  Integer.toString(cam.width()));
+        redis.set(output + ":height",  Integer.toString(cam.height()));
+        redis.set(output + ":channels",  Integer.toString(3));
     }
 
     @Override
@@ -110,53 +214,56 @@ public class CameraServer extends Thread {
     }
 
     int lastTime = 0;
-    public void sendImage() {
 
+    public void sendImage() {
         if (camera != null) {
             // warning, some cameras do not grab ?
             camera.grab();
 
             // get the pixels from native memory
             if (camera.getIplImage() == null) {
-                System.out.println("null Image");
+                log("null Image", "");
                 return;
             }
             ByteBuffer byteBuffer = camera.getIplImage().getByteBuffer();
             byteBuffer.get(imageData);
-
-//            redis.set(key, value)
-//            image(.getPImage(), 0, 0, width, height);
-            String name = defaultName;
+            String name = output;
             byte[] id = name.getBytes();
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ObjectOutput out = null;
-            try {
-                out = new ObjectOutputStream(bos);
-                out.writeObject(imageData);
-                out.flush();
-                byte[] yourBytes = bos.toByteArray();
-
-                System.out.println("Redis set image. " + name);
-//                redis.set(id, yourBytes);
-                redis.publish(id, yourBytes);
-            } catch (ConnectException e) {
-                e.printStackTrace();
-                System.exit(-1);
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.exit(-1);
+            if (isUnique) {
+                redis.set(id, imageData);
+                running = false;
+                log("Sending (SET) image to: " + output, "");
+            } else {
+                redis.publish(id, imageData);
+                log("Sending (PUBLISH) image to: " + output, "");
             }
-
         }
     }
 
-    // TODO: add hostname ?
-    public static final String OUTPUT_PREFIX = "nectar:";
-    public static final String OUTPUT_PREFIX2 = ":camera-server:camera";
-    public static final String REDIS_PORT = "6379";
+    public void die(String why) {
+        die(why, false);
+    }
 
-    static String defaultHost = "jiii-mi";
-    static String defaultName = OUTPUT_PREFIX + defaultHost + OUTPUT_PREFIX2 + "#0";
+    public void die(String why, boolean usage) {
+        if (usage) {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("CameraServer", options);
+        }
+        System.out.println(why);
+        System.exit(-1);
+    }
+
+    public void log(String normal, String verbose) {
+        if (isSilent) {
+            return;
+        }
+        if (normal != null) {
+            System.out.println(normal);
+        }
+        if (isVerbose && verbose != null) {
+            System.out.println(verbose);
+        }
+    }
 
     /**
      * @param passedArgs the command line arguments
@@ -167,21 +274,4 @@ public class CameraServer extends Thread {
         cameraServer.start();
     }
 
-    public byte[] intToBytes(int my_int) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutput out = new ObjectOutputStream(bos);
-        out.writeInt(my_int);
-        out.close();
-        byte[] int_bytes = bos.toByteArray();
-        bos.close();
-        return int_bytes;
-    }
-
-    public int bytesToInt(byte[] int_bytes) throws IOException {
-        ByteArrayInputStream bis = new ByteArrayInputStream(int_bytes);
-        ObjectInputStream ois = new ObjectInputStream(bis);
-        int my_int = ois.readInt();
-        ois.close();
-        return my_int;
-    }
 }
