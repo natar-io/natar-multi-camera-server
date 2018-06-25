@@ -1,6 +1,5 @@
 package tech.lity.rea.nectar;
 
-import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream;
 import processing.core.*;
 import tech.lity.rea.nectar.camera.Camera;
 import tech.lity.rea.nectar.camera.CannotCreateCameraException;
