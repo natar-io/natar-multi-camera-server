@@ -49,6 +49,7 @@ public class CameraServer extends Thread {
     private String host = REDIS_HOST;
     private int port = REDIS_PORT;
     private boolean isUnique = false;
+    private boolean isStreamSet = false;
     private Camera.Type type;
 
     boolean running = true;
@@ -124,12 +125,16 @@ public class CameraServer extends Thread {
         options.addRequiredOption("id", "device-id", true, "Device id, path or name (driver dependant).");
         options.addOption("f", "format", true, "Format, e.g.: for depth cameras rgb, ir, depth.");
         options.addOption("r", "resolution", true, "Image size, can be used instead of width and height, default 640x480.");
+        // Generic options
+
+        options.addOption("s", "stream", false, " stream mode (PUBLISH).");
+        options.addOption("sg", "stream-set", false, " stream mode (SET).");
+        options.addOption("u", "unique", false, "Unique mode, run only once and use get/set instead of pub/sub");
         options.addOption("dc", "depth-camera", false, "Load the depth video when available.");
 
-// Generic options
         options.addOption("h", "help", false, "print this help.");
         options.addOption("v", "verbose", false, "Verbose activated.");
-        options.addOption("s", "silent", false, "Silent activated.");
+        options.addOption("si", "silent", false, "Silent activated.");
         options.addOption("u", "unique", false, "Unique mode, run only once and use get/set instead of pub/sub");
         options.addRequiredOption("o", "output", true, "Output key.");
         options.addOption("rp", "redisport", true, "Redis port, default is: " + REDIS_PORT);
@@ -170,7 +175,9 @@ public class CameraServer extends Thread {
             } else {
                 die("Please set an output key with -o or --output ", true);
             }
-
+            if (cmd.hasOption("sg")) {
+                isStreamSet = true;
+            }
             if (cmd.hasOption("dc")) {
                 useDepth = true;
             }
@@ -180,7 +187,7 @@ public class CameraServer extends Thread {
             if (cmd.hasOption("v")) {
                 isVerbose = true;
             }
-            if (cmd.hasOption("s")) {
+            if (cmd.hasOption("si")) {
                 isSilent = true;
             }
             if (cmd.hasOption("rh")) {
@@ -250,7 +257,6 @@ public class CameraServer extends Thread {
             sendColorImage();
             if (useDepth) {
                 sendDepthImage();
-
             }
         }
     }
@@ -281,8 +287,14 @@ public class CameraServer extends Thread {
             running = false;
             log("Sending (SET) image to: " + output, "");
         } else {
-            redis.publish(id, imageData);
-            log("Sending (PUBLISH) image to: " + output, "");
+            if (isStreamSet) {
+                redis.set(id, imageData);
+                log("Sending (SET) image to: " + output, "");
+
+            } else {
+                redis.publish(id, imageData);
+                log("Sending (PUBLISH) image to: " + output, "");
+            }
         }
 
     }
