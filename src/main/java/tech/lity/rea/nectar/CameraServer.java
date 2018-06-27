@@ -24,6 +24,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 import tech.lity.rea.nectar.camera.CameraFactory;
+import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 
 /**
  *
@@ -54,6 +55,9 @@ public class CameraServer extends Thread {
 
     boolean isVerbose = false;
     boolean isSilent = false;
+    private boolean useDepth = false;
+
+    private CameraRGBIRDepth dcamera;
 
     public CameraServer(String[] args) {
         checkArguments(args);
@@ -65,6 +69,24 @@ public class CameraServer extends Thread {
 //            camera = CameraFactory.createCamera(Camera.Type.OPENCV, "0", "");
             camera = CameraFactory.createCamera(type, description, format);
             camera.setSize(width, height);
+
+            if (useDepth) {
+                if (camera instanceof CameraRGBIRDepth) {
+                    dcamera = (CameraRGBIRDepth) camera;
+                    dcamera.setUseColor(true);
+                    dcamera.setUseDepth(true);
+                    sendDepthParams(dcamera.getDepthCamera());
+                    initDepthMemory(
+                            dcamera.getDepthCamera().width(),
+                            dcamera.getDepthCamera().height(),
+                            2, 1);
+
+                    dcamera.actAsColorCamera();
+
+                } else {
+                    die("Camera not recognized as a depth camera.");
+                }
+            }
             camera.start();
             sendParams(camera);
             initMemory(width, height, 3, 1);
@@ -101,10 +123,10 @@ public class CameraServer extends Thread {
         options.addRequiredOption("d", "driver", true, "Driver to use amongst: " + buildDriverNames());
         options.addRequiredOption("id", "device-id", true, "Device id, path or name (driver dependant).");
         options.addOption("f", "format", true, "Format, e.g.: for depth cameras rgb, ir, depth.");
-        options.addOption("w", "width", true, "Image width, default 640.");
-        options.addOption("h", "height", true, "Image height, default 480.");
         options.addOption("r", "resolution", true, "Image size, can be used instead of width and height, default 640x480.");
-        // Generic options
+        options.addOption("dc", "depth-camera", false, "Load the depth video when available.");
+
+// Generic options
         options.addOption("h", "help", false, "print this help.");
         options.addOption("v", "verbose", false, "Verbose activated.");
         options.addOption("s", "silent", false, "Silent activated.");
@@ -139,13 +161,6 @@ public class CameraServer extends Thread {
                 height = Integer.parseInt(split[1]);
             }
 
-            if (cmd.hasOption("w")) {
-                width = Integer.parseInt(cmd.getOptionValue("w"));
-            }
-            if (cmd.hasOption("h")) {
-                height = Integer.parseInt(cmd.getOptionValue("h"));
-            }
-
             if (cmd.hasOption("h")) {
                 die("", true);
             }
@@ -156,6 +171,9 @@ public class CameraServer extends Thread {
                 die("Please set an output key with -o or --output ", true);
             }
 
+            if (cmd.hasOption("dc")) {
+                useDepth = true;
+            }
             if (cmd.hasOption("u")) {
                 isUnique = true;
             }
@@ -192,9 +210,15 @@ public class CameraServer extends Thread {
     }
 
     private void sendParams(Camera cam) {
-        redis.set(output + ":width",  Integer.toString(cam.width()));
-        redis.set(output + ":height",  Integer.toString(cam.height()));
-        redis.set(output + ":channels",  Integer.toString(3));
+        redis.set(output + ":width", Integer.toString(cam.width()));
+        redis.set(output + ":height", Integer.toString(cam.height()));
+        redis.set(output + ":channels", Integer.toString(3));
+    }
+
+    private void sendDepthParams(Camera cam) {
+        redis.set(output + ":depth:width", Integer.toString(cam.width()));
+        redis.set(output + ":depth:height", Integer.toString(cam.height()));
+        redis.set(output + ":depth:channels", Integer.toString(2));
     }
 
     @Override
@@ -207,9 +231,14 @@ public class CameraServer extends Thread {
 
     PImage copy = null;
     byte[] imageData;
+    byte[] depthImageData;
 
     private void initMemory(int width, int height, int nChannels, int bytePerChannel) {
         imageData = new byte[nChannels * width * height * bytePerChannel];
+    }
+
+    private void initDepthMemory(int width, int height, int nChannels, int bytePerChannel) {
+        depthImageData = new byte[nChannels * width * height * bytePerChannel];
     }
 
     int lastTime = 0;
@@ -218,25 +247,64 @@ public class CameraServer extends Thread {
         if (camera != null) {
             // warning, some cameras do not grab ?
             camera.grab();
+            sendColorImage();
+            if (useDepth) {
+                sendDepthImage();
 
-            // get the pixels from native memory
-            if (camera.getIplImage() == null) {
-                log("null Image", "");
-                return;
-            }
-            ByteBuffer byteBuffer = camera.getIplImage().getByteBuffer();
-            byteBuffer.get(imageData);
-            String name = output;
-            byte[] id = name.getBytes();
-            if (isUnique) {
-                redis.set(id, imageData);
-                running = false;
-                log("Sending (SET) image to: " + output, "");
-            } else {
-                redis.publish(id, imageData);
-                log("Sending (PUBLISH) image to: " + output, "");
             }
         }
+    }
+
+    private void sendColorImage() {
+
+        ByteBuffer byteBuffer;
+        if (useDepth) {
+            if (dcamera.getColorCamera().getIplImage() == null) {
+                log("null color Image -d", "");
+                return;
+            }
+            byteBuffer = dcamera.getColorCamera().getIplImage().getByteBuffer();
+
+        } else {
+            // get the pixels from native memory
+            if (camera.getIplImage() == null) {
+                log("null color Image", "");
+                return;
+            }
+            byteBuffer = camera.getIplImage().getByteBuffer();
+        }
+        byteBuffer.get(imageData);
+        String name = output;
+        byte[] id = name.getBytes();
+        if (isUnique) {
+            redis.set(id, imageData);
+            running = false;
+            log("Sending (SET) image to: " + output, "");
+        } else {
+            redis.publish(id, imageData);
+            log("Sending (PUBLISH) image to: " + output, "");
+        }
+
+    }
+
+    private void sendDepthImage() {
+        if (dcamera.getDepthCamera().getIplImage() == null) {
+            log("null depth Image", "");
+            return;
+        }
+        ByteBuffer byteBuffer = dcamera.getDepthCamera().getIplImage().getByteBuffer();
+        byteBuffer.get(depthImageData);
+        String name = output + ":depth:raw";
+        byte[] id = (name).getBytes();
+        if (isUnique) {
+            redis.set(id, depthImageData);
+            running = false;
+            log("Sending (SET) image to: " + name, "");
+        } else {
+            redis.publish(id, depthImageData);
+            log("Sending (PUBLISH) image to: " + name, "");
+        }
+
     }
 
     public void die(String why) {
