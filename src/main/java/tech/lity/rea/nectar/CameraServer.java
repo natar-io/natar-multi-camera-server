@@ -313,8 +313,15 @@ public class CameraServer extends Thread {
             running = false;
             log("Sending (SET) image to: " + name, "");
         } else {
-            redis.publish(id, depthImageData);
-            log("Sending (PUBLISH) image to: " + name, "");
+            if (isStreamSet) {
+                redis.set(id, depthImageData);
+                log("Sending (SET) image to: " + name, "");
+
+            } else {
+                redis.publish(id, depthImageData);
+                log("Sending (PUBLISH) image to: " + name, "");
+            }
+
         }
 
     }
