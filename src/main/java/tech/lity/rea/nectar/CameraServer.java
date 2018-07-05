@@ -50,6 +50,7 @@ public class CameraServer extends Thread {
     private int port = REDIS_PORT;
     private boolean isUnique = false;
     private boolean isStreamSet = false;
+    private boolean isStreamPublish = true;
     private Camera.Type type;
 
     boolean running = true;
@@ -147,18 +148,12 @@ public class CameraServer extends Thread {
         try {
             cmd = parser.parse(options, passedArgs);
 
-            if (cmd.hasOption("d")) {
-                driverName = cmd.getOptionValue("d");
-                type = Camera.Type.valueOf(driverName);
-                // TODO: CHECK TYPE PROBLEM
-            }
-            if (cmd.hasOption("id")) {
-                description = cmd.getOptionValue("id");
-            }
+            driverName = cmd.getOptionValue("d");
+            type = Camera.Type.valueOf(driverName);
+            description = cmd.getOptionValue("id");
+            output = cmd.getOptionValue("o");
+            format = cmd.hasOption("f") ? cmd.getOptionValue("f") : format;
 
-            if (cmd.hasOption("f")) {
-                format = cmd.getOptionValue("f");
-            }
             if (cmd.hasOption("r")) {
                 String resolution = cmd.getOptionValue("r");
                 String[] split = resolution.split("x");
@@ -170,32 +165,19 @@ public class CameraServer extends Thread {
                 die("", true);
             }
 
-            if (cmd.hasOption("o")) {
-                output = cmd.getOptionValue("o");
-            } else {
-                die("Please set an output key with -o or --output ", true);
-            }
             if (cmd.hasOption("sg")) {
                 isStreamSet = true;
+                isStreamPublish = false;
             }
-            if (cmd.hasOption("dc")) {
-                useDepth = true;
-            }
-            if (cmd.hasOption("u")) {
-                isUnique = true;
-            }
-            if (cmd.hasOption("v")) {
-                isVerbose = true;
-            }
-            if (cmd.hasOption("si")) {
-                isSilent = true;
-            }
-            if (cmd.hasOption("rh")) {
-                host = cmd.getOptionValue("rh");
-            }
-            if (cmd.hasOption("rp")) {
-                port = Integer.parseInt(cmd.getOptionValue("rp"));
-            }
+
+            isStreamPublish = cmd.hasOption("s");
+            useDepth = cmd.hasOption("dc");
+            isUnique = cmd.hasOption("u");
+            isVerbose = cmd.hasOption("v");
+            isSilent = cmd.hasOption("si");
+            host = cmd.hasOption("rh") ? cmd.getOptionValue("rh") : host;
+            port = cmd.hasOption("rp") ? Integer.parseInt(cmd.getOptionValue("rp")) : port;
+
         } catch (ParseException ex) {
             die(ex.toString(), true);
 //            Logger.getLogger(PoseEstimator.class.getName()).log(Level.SEVERE, null, ex);
@@ -290,8 +272,9 @@ public class CameraServer extends Thread {
             if (isStreamSet) {
                 redis.set(id, imageData);
                 log("Sending (SET) image to: " + output, "");
+            }
 
-            } else {
+            if (isStreamPublish) {
                 redis.publish(id, imageData);
                 log("Sending (PUBLISH) image to: " + output, "");
             }
@@ -316,8 +299,8 @@ public class CameraServer extends Thread {
             if (isStreamSet) {
                 redis.set(id, depthImageData);
                 log("Sending (SET) image to: " + name, "");
-
-            } else {
+            }
+            if(isStreamPublish){
                 redis.publish(id, depthImageData);
                 log("Sending (PUBLISH) image to: " + name, "");
             }
