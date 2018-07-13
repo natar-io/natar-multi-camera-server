@@ -265,16 +265,18 @@ public class CameraServer extends Thread {
         byteBuffer.get(imageData);
         String name = output;
         byte[] id = name.getBytes();
+        String time = Long.toString(time());
         if (isUnique) {
             redis.set(id, imageData);
             running = false;
             log("Sending (SET) image to: " + output, "");
+            redis.set((name + ":timestamp"), time);
         } else {
             if (isStreamSet) {
                 redis.set(id, imageData);
+                redis.set((name + ":timestamp"), time);
                 log("Sending (SET) image to: " + output, "");
             }
-
             if (isStreamPublish) {
                 redis.publish(id, imageData);
                 log("Sending (PUBLISH) image to: " + output, "");
