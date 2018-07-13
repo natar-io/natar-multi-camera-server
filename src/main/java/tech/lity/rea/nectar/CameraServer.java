@@ -171,7 +171,6 @@ public class CameraServer extends Thread {
                 isStreamPublish = false;
             }
 
-            isStreamPublish = cmd.hasOption("s");
             useDepth = cmd.hasOption("dc");
             isUnique = cmd.hasOption("u");
             isVerbose = cmd.hasOption("v");
@@ -203,12 +202,14 @@ public class CameraServer extends Thread {
         redis.set(output + ":width", Integer.toString(cam.width()));
         redis.set(output + ":height", Integer.toString(cam.height()));
         redis.set(output + ":channels", Integer.toString(3));
+        redis.set(output + ":pixelformat", cam.getPixelFormat().toString());
     }
 
     private void sendDepthParams(Camera cam) {
         redis.set(output + ":depth:width", Integer.toString(cam.width()));
         redis.set(output + ":depth:height", Integer.toString(cam.height()));
         redis.set(output + ":depth:channels", Integer.toString(2));
+        redis.set(output + ":depth:pixelformat", cam.getPixelFormat().toString());
     }
 
     @Override
@@ -247,14 +248,15 @@ public class CameraServer extends Thread {
     private void sendColorImage() {
 
         ByteBuffer byteBuffer;
+
         if (useDepth) {
             if (dcamera.getColorCamera().getIplImage() == null) {
                 log("null color Image -d", "");
                 return;
             }
             byteBuffer = dcamera.getColorCamera().getIplImage().getByteBuffer();
-
         } else {
+
             // get the pixels from native memory
             if (camera.getIplImage() == null) {
                 log("null color Image", "");

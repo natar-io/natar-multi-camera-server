@@ -422,29 +422,7 @@ public abstract class Camera implements PConstants{
      * @param img
      */
     protected void updateCurrentImage(IplImage img) {
-
-//        this.timeStamp = parent.millis();
-
-        if (undistort) {
-//            if (pdp == null || !pdp.handleDistorsions()) {
-//                System.err.println("I cannot distort the image for processing. The "
-//                        + "calibration did not contain information. ");
-//                return;
-//            }
-//
-//            if (copyUndist == null) {
-//                copyUndist = img.clone();
-//            }
-//            // Workaround for crash when the java program is closing
-//            // to avoid native code to continue to run...
-//            if (isClosing()) {
-//                return;
-//            }
-//            pdp.getDevice().undistort(img, copyUndist);
-//            currentImage = copyUndist;
-        } else {
-            currentImage = img;
-        }
+        currentImage = img;
     }
 
     /**
