@@ -38,6 +38,7 @@ public class CameraServer extends Thread {
     // Arguments
     public static final int REDIS_PORT = 6379;
     public static final String REDIS_HOST = "localhost";
+    private long millisOffset = System.currentTimeMillis();
 
     private String driverName = "";
     private String description = "0";
@@ -291,22 +292,33 @@ public class CameraServer extends Thread {
         byteBuffer.get(depthImageData);
         String name = output + ":depth:raw";
         byte[] id = (name).getBytes();
+        String time = Long.toString(time());
+
         if (isUnique) {
             redis.set(id, depthImageData);
+            redis.set((name + ":timestamp"), time);
+
             running = false;
             log("Sending (SET) image to: " + name, "");
         } else {
             if (isStreamSet) {
+
                 redis.set(id, depthImageData);
+                redis.set((name + ":timestamp"), time);
+
                 log("Sending (SET) image to: " + name, "");
             }
-            if(isStreamPublish){
+            if (isStreamPublish) {
                 redis.publish(id, depthImageData);
                 log("Sending (PUBLISH) image to: " + name, "");
             }
 
         }
 
+    }
+
+    private long time() {
+        return System.currentTimeMillis() - millisOffset;
     }
 
     public void die(String why) {
