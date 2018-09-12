@@ -246,7 +246,6 @@ public class CameraServer extends Thread {
     }
 
     private void sendColorImage() {
-
         ByteBuffer byteBuffer;
 
         if (useDepth) {
@@ -280,6 +279,9 @@ public class CameraServer extends Thread {
                 log("Sending (SET) image to: " + output, "");
             }
             if (isStreamPublish) {
+                if (!isStreamSet) {
+                    redis.set((name + ":timestamp"), time);
+                }
                 redis.publish(id, imageData);
                 log("Sending (PUBLISH) image to: " + output, "");
             }
@@ -313,6 +315,10 @@ public class CameraServer extends Thread {
                 log("Sending (SET) image to: " + name, "");
             }
             if (isStreamPublish) {
+
+                if (!isStreamSet) {
+                    redis.set((name + ":timestamp"), time);
+                }
                 redis.publish(id, depthImageData);
                 log("Sending (PUBLISH) image to: " + name, "");
             }
