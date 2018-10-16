@@ -26,6 +26,9 @@ import redis.clients.jedis.Jedis;
 import tech.lity.rea.nectar.camera.CameraFactory;
 import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 
+import processing.data.JSONArray;
+import processing.data.JSONObject;
+
 /**
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
@@ -59,6 +62,9 @@ public class CameraServer extends Thread {
     boolean isVerbose = false;
     boolean isSilent = false;
     private boolean useDepth = false;
+    
+    private long colorImageCount = 0;
+    private long depthImageCount = 0;
 
     private CameraRGBIRDepth dcamera;
 
@@ -247,7 +253,6 @@ public class CameraServer extends Thread {
 
     private void sendColorImage() {
         ByteBuffer byteBuffer;
-
         if (useDepth) {
             if (dcamera.getColorCamera().getIplImage() == null) {
                 log("null color Image -d", "");
@@ -263,6 +268,7 @@ public class CameraServer extends Thread {
             }
             byteBuffer = camera.getIplImage().getByteBuffer();
         }
+        colorImageCount++;
         byteBuffer.get(imageData);
         String name = output;
         byte[] id = name.getBytes();
@@ -279,10 +285,11 @@ public class CameraServer extends Thread {
                 log("Sending (SET) image to: " + output, "");
             }
             if (isStreamPublish) {
-                if (!isStreamSet) {
-                    redis.set((name + ":timestamp"), time);
-                }
-                redis.publish(id, imageData);
+                JSONObject imageInfo = new JSONObject();
+                imageInfo.setLong("timestamp", time());
+                imageInfo.setLong("imageCount", colorImageCount);
+                redis.set(id, imageData);
+                redis.publish(id, imageInfo.toString().getBytes());
                 log("Sending (PUBLISH) image to: " + output, "");
             }
         }
@@ -294,6 +301,7 @@ public class CameraServer extends Thread {
             log("null depth Image", "");
             return;
         }
+        depthImageCount++;
         ByteBuffer byteBuffer = dcamera.getDepthCamera().getIplImage().getByteBuffer();
         byteBuffer.get(depthImageData);
         String name = output + ":depth:raw";
@@ -315,11 +323,11 @@ public class CameraServer extends Thread {
                 log("Sending (SET) image to: " + name, "");
             }
             if (isStreamPublish) {
-
-                if (!isStreamSet) {
-                    redis.set((name + ":timestamp"), time);
-                }
-                redis.publish(id, depthImageData);
+                JSONObject imageInfo = new JSONObject();
+                imageInfo.setLong("timestamp", time());
+                imageInfo.setLong("imageCount", depthImageCount);
+                redis.set(id, depthImageData);
+                redis.publish(id, imageInfo.toString().getBytes());
                 log("Sending (PUBLISH) image to: " + name, "");
             }
 
