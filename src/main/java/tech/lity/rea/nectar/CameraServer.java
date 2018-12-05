@@ -28,6 +28,7 @@ import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 
 import processing.data.JSONArray;
 import processing.data.JSONObject;
+import tech.lity.rea.nectar.camera.CameraOpenNI2;
 
 /**
  *
@@ -62,7 +63,7 @@ public class CameraServer extends Thread {
     boolean isVerbose = false;
     boolean isSilent = false;
     private boolean useDepth = false;
-    
+
     private long colorImageCount = 0;
     private long depthImageCount = 0;
 
@@ -70,7 +71,7 @@ public class CameraServer extends Thread {
 
     public CameraServer(String[] args) {
         checkArguments(args);
-        connectRedist();
+        connectRedis();
 
         try {
             // application only using a camera
@@ -96,6 +97,12 @@ public class CameraServer extends Thread {
                     die("Camera not recognized as a depth camera.");
                 }
             }
+
+            if (camera instanceof CameraOpenNI2) {
+                CameraOpenNI2 cameraNI = (CameraOpenNI2) camera;
+                cameraNI.sendToRedis(this, host, port);
+            }
+
             camera.start();
             sendParams(camera);
             initMemory(width, height, 3, 1);
@@ -191,16 +198,18 @@ public class CameraServer extends Thread {
 
     }
 
-    private void connectRedist() {
+    public Jedis connectRedis() {
         try {
             redis = new Jedis(host, port);
             if (redis == null) {
                 throw new Exception("Cannot connect to server. ");
             }
+            return redis;
         } catch (Exception e) {
             e.printStackTrace();
             System.exit(0);
         }
+        return null;
         // redis.auth("156;2Asatu:AUI?S2T51235AUEAIU");
     }
 
@@ -242,6 +251,17 @@ public class CameraServer extends Thread {
 
     public void sendImage() {
         if (camera != null) {
+
+            // OpenNI2 camera is not grabbed here
+            if(camera instanceof CameraOpenNI2){
+                try {
+                    Thread.sleep(1000);
+                    return;
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+            
             // warning, some cameras do not grab ?
             camera.grab();
             sendColorImage();
@@ -335,7 +355,7 @@ public class CameraServer extends Thread {
 
     }
 
-    private long time() {
+    public long time() {
         return System.currentTimeMillis() - millisOffset;
     }
 
@@ -371,6 +391,10 @@ public class CameraServer extends Thread {
 
         CameraServer cameraServer = new CameraServer(passedArgs);
         cameraServer.start();
+    }
+
+    public String getOutput() {
+        return this.output;
     }
 
 }

@@ -19,28 +19,29 @@
  */
 package tech.lity.rea.nectar.camera;
 
+import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
+import io.lettuce.core.codec.ByteArrayCodec;
+import io.lettuce.core.codec.RedisCodec;
+import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
+import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.bytedeco.javacpp.freenect;
 import org.bytedeco.javacv.FrameGrabber;
 
-import java.awt.*;
-import java.awt.image.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import javax.swing.JOptionPane;
-import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.opencv_core;
 import static org.bytedeco.javacpp.opencv_core.IPL_DEPTH_8U;
-import org.bytedeco.javacpp.opencv_imgproc;
-import static org.bytedeco.javacpp.opencv_imgproc.COLOR_BGR2GRAY;
-import static org.bytedeco.javacpp.opencv_imgproc.COLOR_RGB2BGR;
 
 import org.openni.*;
-import static org.openni.PixelFormat.RGB888;
-import org.openni.VideoStream.CameraSettings;
+import processing.data.JSONObject;
+import redis.clients.jedis.Jedis;
+import tech.lity.rea.nectar.CameraServer;
+
 /**
  *
  * @author Jeremy Laviole
@@ -51,6 +52,8 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
     private FrameListener colorListener, irListener, depthListener;
     // From the OpenNI example.
     Device device;
+    private int colorImageCount;
+    private int depthImageCount;
 
     protected CameraOpenNI2(int cameraNo) {
         this.systemNumber = cameraNo;
@@ -310,6 +313,80 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
         gray16Buffer.rewind();
     }
 
+    CameraServer server;
+    Jedis redis;
+//    RedisConnection redis;
+    StatefulRedisConnection<byte[], byte[]> getSet;
+    StatefulRedisPubSubConnection<byte[], byte[]> pubsub;
+    RedisCommands<byte[], byte[]> getSetSync;
+    RedisPubSubCommands<byte[], byte[]> pubsubSync;
+
+    RedisClient client;
+
+    public void sendToRedis(CameraServer camServer, String host, int port) {
+        server = camServer;
+//        this.redis = redis;
+
+//        client = RedisClient.create("redis://localhost");
+        client = RedisClient.create("redis://" + host + ":" + Integer.toString(port)); 
+//        StatefulRedisConnection<String, String> connection = client.connect();
+//        RedisStringCommands sync = connection.sync();
+//        String value = (String) sync.get("key");
+        ByteArrayCodec codec = io.lettuce.core.codec.ByteArrayCodec.INSTANCE;
+
+        getSet = client.connect(codec);
+        getSetSync = getSet.sync();
+        pubsub = client.connectPubSub(codec);
+        pubsubSync = pubsub.sync();
+    }
+
+    protected void sendColor(byte[] imageData) {
+        colorImageCount++;
+        byte[] id = server.getOutput().getBytes();
+        JSONObject imageInfo = new JSONObject();
+        imageInfo.setLong("timestamp", server.time());
+        imageInfo.setLong("imageCount", colorImageCount);
+        System.out.println("ImageData size: " + imageData.length + " " + colorImageCount);
+
+        try {
+            
+            getSetSync.set(id, imageData);
+            pubsubSync.publish(id, imageInfo.toString().getBytes());
+            
+//            redis.set(id, imageData);
+//            redis.publish(id, imageInfo.toString().getBytes());
+        } catch (Exception e) {
+            System.out.println("Sending: " + server.getOutput() + " : " + imageInfo.toString());
+            System.out.println("Exception: " + e);
+            e.printStackTrace();
+            redis = server.connectRedis();
+        }
+    }
+
+    protected void sendDepth(byte[] imageData) {
+        depthImageCount++;
+        String name = server.getOutput() + ":depth:raw";
+        byte[] id = (name).getBytes();
+
+        JSONObject imageInfo = new JSONObject();
+        imageInfo.setLong("timestamp", server.time());
+        imageInfo.setLong("imageCount", depthImageCount);
+
+        try {
+                 getSetSync.set(id, imageData);
+            pubsubSync.publish(id, imageInfo.toString().getBytes());
+            
+            
+//            redis.set(id, imageData);
+//            redis.publish(id, imageInfo.toString().getBytes());
+        } catch (Exception e) {
+            System.out.println("Exception: " + e);
+            e.printStackTrace();
+            redis = server.connectRedis();
+        }
+
+    }
+
     class FrameListener implements VideoStream.NewFrameListener {
 
         VideoFrameRef lastFrame;
@@ -360,6 +437,13 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
 
                 byte[] frameDataBytes = new byte[frameSize];
                 frameData.get(frameDataBytes);
+
+                // Juste forward the bytes if on server... 
+                if (server != null) {
+                    sendColor(frameDataBytes);
+                    return;
+                }
+
                 if (rawVideoImage == null || rawVideoImage.width() != deviceWidth || rawVideoImage.height() != deviceHeight) {
                     rawVideoImage = opencv_core.IplImage.create(deviceWidth, deviceHeight, iplDepth, channels);
                     rawVideoImageGray = opencv_core.IplImage.create(deviceWidth, deviceHeight, iplDepth, 1);
@@ -380,6 +464,12 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
                 // TODO: Handle as a sort buffer instead of byte.
                 byte[] frameDataBytes = new byte[frameSize];
                 frameData.get(frameDataBytes);
+
+                if (server != null) {
+                    sendDepth(frameDataBytes);
+                    return;
+                }
+
                 if (rawVideoImage == null || rawVideoImage.width() != deviceWidth || rawVideoImage.height() != deviceHeight) {
                     rawVideoImage = opencv_core.IplImage.create(deviceWidth, deviceHeight, iplDepth, channels);
                 }
@@ -411,29 +501,30 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
     }
 
     @Override
-    public void setAutoWhiteBalance(boolean v){
+    public void setAutoWhiteBalance(boolean v) {
         this.colorStream.getCameraSettings().setAutoWhiteBalanceEnabled(v);
     }
 
     @Override
-    public void setAutoExposure(boolean v){
+    public void setAutoExposure(boolean v) {
         this.colorStream.getCameraSettings().setAutoExposureEnabled(v);
     }
-    
+
     @Override
-    public boolean isAutoExposure(){
-      return this.colorStream.getCameraSettings().getAutoExposureEnabled();
+    public boolean isAutoExposure() {
+        return this.colorStream.getCameraSettings().getAutoExposureEnabled();
     }
+
     @Override
-    public boolean isAutoWhiteBalance(){
-      return this.colorStream.getCameraSettings().getAutoWhiteBalanceEnabled();
+    public boolean isAutoWhiteBalance() {
+        return this.colorStream.getCameraSettings().getAutoWhiteBalanceEnabled();
     }
-      
-    public void test(){
+
+    public void test() {
         this.colorStream.getCameraSettings().setAutoExposureEnabled(useIR);
         this.colorStream.getCameraSettings().setAutoWhiteBalanceEnabled(useIR);
     }
-    
+
 //    public CameraSettings getCameraSettings(){
 //        
 //    }
