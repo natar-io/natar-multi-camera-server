@@ -20,19 +20,13 @@
  */
 package tech.lity.rea.nectar.depthcam;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.bytedeco.javacpp.opencv_core.IplImage;
 import processing.core.PApplet;
 import processing.core.PMatrix3D;
 import processing.core.PVector;
 import tech.lity.rea.nectar.camera.Camera;
-import tech.lity.rea.nectar.camera.CameraFactory;
 import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
-import tech.lity.rea.nectar.camera.CannotCreateCameraException;
 import tech.lity.rea.nectar.camera.SubCamera;
 import tech.lity.rea.nectar.camera.SubDepthCamera;
-import toxi.geom.Vec3D;
 
 /**
  *
