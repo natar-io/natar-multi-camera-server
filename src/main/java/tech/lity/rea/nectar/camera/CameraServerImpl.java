@@ -1,4 +1,4 @@
-package tech.lity.rea.nectar;
+package tech.lity.rea.nectar.camera;
 
 import processing.core.*;
 import tech.lity.rea.nectar.camera.Camera;
@@ -29,12 +29,13 @@ import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 import processing.data.JSONArray;
 import processing.data.JSONObject;
 import tech.lity.rea.nectar.camera.CameraOpenNI2;
+import tech.lity.rea.nectar.camera.CameraServer;
 
 /**
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
  */
-public class CameraServer extends Thread {
+public class CameraServerImpl extends CameraServer {
 
     Jedis redis, redisSend;
     Camera camera;
@@ -69,7 +70,7 @@ public class CameraServer extends Thread {
 
     private CameraRGBIRDepth dcamera;
 
-    public CameraServer(String[] args) {
+    public CameraServerImpl(String[] args) {
         checkArguments(args);
         connectRedis();
 
@@ -110,9 +111,11 @@ public class CameraServer extends Thread {
 //            camera.setParent(applet);
 //            camera.setCalibration(cameraCalib);
         } catch (CannotCreateCameraException ex) {
-            Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(CameraServerImpl.class.getName()).log(Level.SEVERE, null, ex);
             die(ex.toString());
         }
+
+//        papart.startTracking();
 
 //        papart.startTracking();
     }
@@ -258,7 +261,7 @@ public class CameraServer extends Thread {
                     Thread.sleep(1000);
                     return;
                 } catch (InterruptedException ex) {
-                    Logger.getLogger(CameraServer.class.getName()).log(Level.SEVERE, null, ex);
+                    Logger.getLogger(CameraServerImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
             
@@ -389,7 +392,7 @@ public class CameraServer extends Thread {
      */
     static public void main(String[] passedArgs) {
 
-        CameraServer cameraServer = new CameraServer(passedArgs);
+        CameraServerImpl cameraServer = new CameraServerImpl(passedArgs);
         cameraServer.start();
     }
 

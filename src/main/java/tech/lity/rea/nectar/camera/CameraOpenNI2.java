@@ -40,7 +40,6 @@ import static org.bytedeco.javacpp.opencv_core.IPL_DEPTH_8U;
 import org.openni.*;
 import processing.data.JSONObject;
 import redis.clients.jedis.Jedis;
-import tech.lity.rea.nectar.CameraServer;
 
 /**
  *
@@ -346,8 +345,6 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
         JSONObject imageInfo = new JSONObject();
         imageInfo.setLong("timestamp", server.time());
         imageInfo.setLong("imageCount", colorImageCount);
-        System.out.println("ImageData size: " + imageData.length + " " + colorImageCount);
-
         try {
             
             getSetSync.set(id, imageData);
