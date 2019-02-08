@@ -1,35 +1,19 @@
 package tech.lity.rea.nectar.camera;
 
 import processing.core.*;
-import tech.lity.rea.nectar.camera.Camera;
-import tech.lity.rea.nectar.camera.CannotCreateCameraException;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
-import java.net.ConnectException;
 import java.nio.ByteBuffer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
-import org.apache.commons.cli.Option.Builder;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
-import tech.lity.rea.nectar.camera.CameraFactory;
-import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 
-import processing.data.JSONArray;
 import processing.data.JSONObject;
-import tech.lity.rea.nectar.camera.CameraOpenNI2;
-import tech.lity.rea.nectar.camera.CameraServer;
 
 /**
  *
