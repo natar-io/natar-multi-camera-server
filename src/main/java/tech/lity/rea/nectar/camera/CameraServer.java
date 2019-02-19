@@ -6,9 +6,9 @@ import redis.clients.jedis.Jedis;
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
  */
-public abstract class CameraServer extends Thread{
+public abstract interface CameraServer {
 
-    abstract public Jedis connectRedis();
+    abstract public Jedis createRedisConnection();
     abstract public void sendImage();
     abstract public String getOutput();
     abstract public long time();

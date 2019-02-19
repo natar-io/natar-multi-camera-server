@@ -14,39 +14,31 @@ import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 
 import processing.data.JSONObject;
+import tech.lity.rea.nectar.apps.NectarApplication;
 
 /**
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
  */
-public class CameraServerImpl extends CameraServer {
+public class CameraServerImpl extends NectarApplication implements CameraServer, Runnable {
 
     Jedis redis, redisSend;
     Camera camera;
 
     // Arguments
-    public static final int REDIS_PORT = 6379;
-    public static final String REDIS_HOST = "localhost";
     private long millisOffset = System.currentTimeMillis();
 
     private String driverName = "";
     private String description = "0";
     private String format = "";
     private int width = 640, height = 480;
-    private String markerFileName = "";
-    private String input = "marker";
     private String output = "pose";
-    private String host = REDIS_HOST;
-    private int port = REDIS_PORT;
-    private boolean isUnique = false;
     private boolean isStreamSet = false;
     private boolean isStreamPublish = true;
     private Camera.Type type;
 
     boolean running = true;
 
-    boolean isVerbose = false;
-    boolean isSilent = false;
     private boolean useDepth = false;
 
     private long colorImageCount = 0;
@@ -99,11 +91,14 @@ public class CameraServerImpl extends CameraServer {
             die(ex.toString());
         }
 
-//        papart.startTracking();
-
-//        papart.startTracking();
     }
 
+    
+    @Override
+    public Jedis createRedisConnection(){
+        return connectRedis();
+    }
+    
     private Options options;
 
     private String buildDriverNames() {
@@ -118,29 +113,27 @@ public class CameraServerImpl extends CameraServer {
         return driversText.toString();
     }
 
-    private void checkArguments(String[] passedArgs) {
-        options = new Options();
-
-//        public static Camera createCamera(Camera.Type type, String description, String format)
+    private void addCLIArgs(Options options) {
 //        options.addRequiredOption("i", "input", true, "Input key of marker locations.");
         options.addRequiredOption("d", "driver", true, "Driver to use amongst: " + buildDriverNames());
         options.addRequiredOption("id", "device-id", true, "Device id, path or name (driver dependant).");
         options.addOption("f", "format", true, "Format, e.g.: for depth cameras rgb, ir, depth.");
         options.addOption("r", "resolution", true, "Image size, can be used instead of width and height, default 640x480.");
-        // Generic options
 
+        // Generic options
         options.addOption("s", "stream", false, " stream mode (PUBLISH).");
         options.addOption("sg", "stream-set", false, " stream mode (SET).");
         options.addOption("u", "unique", false, "Unique mode, run only once and use get/set instead of pub/sub");
         options.addOption("dc", "depth-camera", false, "Load the depth video when available.");
 
-        options.addOption("h", "help", false, "print this help.");
-        options.addOption("v", "verbose", false, "Verbose activated.");
-        options.addOption("si", "silent", false, "Silent activated.");
-        options.addOption("u", "unique", false, "Unique mode, run only once and use get/set instead of pub/sub");
         options.addRequiredOption("o", "output", true, "Output key.");
-        options.addOption("rp", "redisport", true, "Redis port, default is: " + REDIS_PORT);
-        options.addOption("rh", "redishost", true, "Redis host, default is: " + REDIS_HOST);
+    }
+
+    private void checkArguments(String[] passedArgs) {
+        options = new Options();
+
+        addCLIArgs(options);
+        addDefaultOptions(options);
 
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd;
@@ -148,6 +141,8 @@ public class CameraServerImpl extends CameraServer {
         // -u -i markers -cc data/calibration-AstraS-rgb.yaml -mc data/A4-default.svg -o pose
         try {
             cmd = parser.parse(options, passedArgs);
+
+            parseDefaultOptions(cmd);
 
             driverName = cmd.getOptionValue("d");
             type = Camera.Type.valueOf(driverName);
@@ -162,42 +157,18 @@ public class CameraServerImpl extends CameraServer {
                 height = Integer.parseInt(split[1]);
             }
 
-            if (cmd.hasOption("h")) {
-                die("", true);
-            }
-
             if (cmd.hasOption("sg")) {
                 isStreamSet = true;
                 isStreamPublish = false;
             }
 
             useDepth = cmd.hasOption("dc");
-            isUnique = cmd.hasOption("u");
-            isVerbose = cmd.hasOption("v");
-            isSilent = cmd.hasOption("si");
-            host = cmd.hasOption("rh") ? cmd.getOptionValue("rh") : host;
-            port = cmd.hasOption("rp") ? Integer.parseInt(cmd.getOptionValue("rp")) : port;
 
         } catch (ParseException ex) {
             die(ex.toString(), true);
 //            Logger.getLogger(PoseEstimator.class.getName()).log(Level.SEVERE, null, ex);
         }
 
-    }
-
-    public Jedis connectRedis() {
-        try {
-            redis = new Jedis(host, port);
-            if (redis == null) {
-                throw new Exception("Cannot connect to server. ");
-            }
-            return redis;
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(0);
-        }
-        return null;
-        // redis.auth("156;2Asatu:AUI?S2T51235AUEAIU");
     }
 
     private void sendParams(Camera cam) {
@@ -240,7 +211,7 @@ public class CameraServerImpl extends CameraServer {
         if (camera != null) {
 
             // OpenNI2 camera is not grabbed here
-            if(camera instanceof CameraOpenNI2){
+            if (camera instanceof CameraOpenNI2) {
                 try {
                     Thread.sleep(1000);
                     return;
@@ -248,7 +219,7 @@ public class CameraServerImpl extends CameraServer {
                     Logger.getLogger(CameraServerImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
             }
-            
+
             // warning, some cameras do not grab ?
             camera.grab();
             sendColorImage();
@@ -346,31 +317,6 @@ public class CameraServerImpl extends CameraServer {
         return System.currentTimeMillis() - millisOffset;
     }
 
-    public void die(String why) {
-        die(why, false);
-    }
-
-    public void die(String why, boolean usage) {
-        if (usage) {
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("CameraServer", options);
-        }
-        System.out.println(why);
-        System.exit(-1);
-    }
-
-    public void log(String normal, String verbose) {
-        if (isSilent) {
-            return;
-        }
-        if (normal != null) {
-            System.out.println(normal);
-        }
-        if (isVerbose && verbose != null) {
-            System.out.println(verbose);
-        }
-    }
-
     /**
      * @param passedArgs the command line arguments
      */
@@ -383,5 +329,6 @@ public class CameraServerImpl extends CameraServer {
     public String getOutput() {
         return this.output;
     }
+
 
 }

@@ -64,9 +64,10 @@
             <scope>compile</scope>
         </dependency>
   
+        <!--It should use nectar-apps-->
         <dependency>
             <groupId>tech.lity.rea</groupId>
-            <artifactId>nectar-core</artifactId>
+            <artifactId>nectar-apps</artifactId>
             <version>0.1</version>
         </dependency>
 

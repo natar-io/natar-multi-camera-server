@@ -356,7 +356,7 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
             System.out.println("Sending: " + server.getOutput() + " : " + imageInfo.toString());
             System.out.println("Exception: " + e);
             e.printStackTrace();
-            redis = server.connectRedis();
+            redis = server.createRedisConnection();
         }
     }
 
@@ -379,7 +379,7 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
         } catch (Exception e) {
             System.out.println("Exception: " + e);
             e.printStackTrace();
-            redis = server.connectRedis();
+            redis = server.createRedisConnection();
         }
 
     }
