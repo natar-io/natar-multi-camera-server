@@ -48,7 +48,7 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 
     public CameraServerImpl(String[] args) {
         checkArguments(args);
-        connectRedis();
+        redis = connectRedis();
 
         try {
             // application only using a camera
@@ -77,7 +77,7 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 
             if (camera instanceof CameraOpenNI2) {
                 CameraOpenNI2 cameraNI = (CameraOpenNI2) camera;
-                cameraNI.sendToRedis(this, host, port);
+                cameraNI.sendToRedis(this, host, Integer.parseInt(port));
             }
 
             camera.start();
@@ -190,7 +190,6 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         while (running) {
             sendImage();
         }
-
     }
 
     PImage copy = null;
@@ -323,7 +322,7 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
     static public void main(String[] passedArgs) {
 
         CameraServerImpl cameraServer = new CameraServerImpl(passedArgs);
-        cameraServer.start();
+        new Thread(cameraServer).start();
     }
 
     public String getOutput() {
