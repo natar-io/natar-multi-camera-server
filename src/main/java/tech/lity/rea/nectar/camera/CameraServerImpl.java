@@ -99,7 +99,7 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         return connectRedis();
     }
     
-    private Options options;
+    private static Options options;
 
     private String buildDriverNames() {
         Camera.Type[] values = Camera.Type.values();
@@ -169,6 +169,15 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 //            Logger.getLogger(PoseEstimator.class.getName()).log(Level.SEVERE, null, ex);
         }
 
+    }
+    
+    public static void die(String why, boolean usage) {
+        if (usage) {
+            HelpFormatter formatter = new HelpFormatter();
+            formatter.printHelp("CameraServer", options);
+        }
+        System.out.println(why);
+        System.exit(-1);
     }
 
     private void sendParams(Camera cam) {
