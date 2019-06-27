@@ -22,7 +22,7 @@ import tech.lity.rea.nectar.apps.NectarApplication;
  */
 public class CameraServerImpl extends NectarApplication implements CameraServer, Runnable {
 
-    Jedis redis, redisSend;
+    Jedis redis, redisDepth, redisSend;
     Camera camera;
 
     // Arguments
@@ -49,6 +49,7 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
     public CameraServerImpl(String[] args) {
         checkArguments(args);
         redis = connectRedis();
+        redisDepth = connectRedis();
 
         try {
             // application only using a camera
@@ -185,13 +186,15 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         redis.set(output + ":height", Integer.toString(cam.height()));
         redis.set(output + ":channels", Integer.toString(3));
         redis.set(output + ":pixelformat", cam.getPixelFormat().toString());
+        redis.clientSetname("CameraServer");
     }
 
     private void sendDepthParams(Camera cam) {
-        redis.set(output + ":depth:width", Integer.toString(cam.width()));
-        redis.set(output + ":depth:height", Integer.toString(cam.height()));
-        redis.set(output + ":depth:channels", Integer.toString(2));
-        redis.set(output + ":depth:pixelformat", cam.getPixelFormat().toString());
+        redisDepth.set(output + ":depth:width", Integer.toString(cam.width()));
+        redisDepth.set(output + ":depth:height", Integer.toString(cam.height()));
+        redisDepth.set(output + ":depth:channels", Integer.toString(2));
+        redisDepth.set(output + ":depth:pixelformat", cam.getPixelFormat().toString());
+        redisDepth.clientSetname("DepthCameraServer");
     }
 
     @Override
@@ -295,16 +298,16 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         String time = Long.toString(time());
 
         if (isUnique) {
-            redis.set(id, depthImageData);
-            redis.set((name + ":timestamp"), time);
+            redisDepth.set(id, depthImageData);
+            redisDepth.set((name + ":timestamp"), time);
 
             running = false;
             log("Sending (SET) image to: " + name, "");
         } else {
             if (isStreamSet) {
 
-                redis.set(id, depthImageData);
-                redis.set((name + ":timestamp"), time);
+                redisDepth.set(id, depthImageData);
+                redisDepth.set((name + ":timestamp"), time);
 
                 log("Sending (SET) image to: " + name, "");
             }
@@ -312,13 +315,11 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
                 JSONObject imageInfo = new JSONObject();
                 imageInfo.setLong("timestamp", time());
                 imageInfo.setLong("imageCount", depthImageCount);
-                redis.set(id, depthImageData);
-                redis.publish(id, imageInfo.toString().getBytes());
+                redisDepth.set(id, depthImageData);
+                redisDepth.publish(id, imageInfo.toString().getBytes());
                 log("Sending (PUBLISH) image to: " + name, "");
             }
-
         }
-
     }
 
     public long time() {
