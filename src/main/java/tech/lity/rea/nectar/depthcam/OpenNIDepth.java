@@ -7,12 +7,13 @@ package tech.lity.rea.nectar.depthcam;
 
 import java.nio.ShortBuffer;
 import org.bytedeco.javacpp.opencv_core;
+import static tech.lity.rea.nectar.depthcam.DepthComputation.INVALID_DEPTH;
 
 /**
  *
  * @author realitytech
  */
-public class OpenNIDepth  {
+public class OpenNIDepth implements DepthComputation {
 
     private ShortBuffer frameData;
     float[] histogram;
@@ -20,17 +21,15 @@ public class OpenNIDepth  {
     public OpenNIDepth() {
     }
 
-//    @Override
-//    public float findDepth(int offset) {
-//        int depth = (int) (frameData.get(offset) & 0xFFFF);
-//        if (depth == 0) {
-//            return INVALID_DEPTH;
-//        }
-//        return depth;
-//    }
-//
-//    @Override
-//    public void updateDepth(opencv_core.IplImage depthImage) {
-//        frameData = depthImage.getShortBuffer();
-//    }
+    public float findDepth(int offset) {
+        int depth = (int) (frameData.get(offset) & 0xFFFF);
+        if (depth == 0) {
+            return INVALID_DEPTH;
+        }
+        return depth;
+    }
+
+    public void updateDepth(opencv_core.IplImage depthImage) {
+        frameData = depthImage.getShortBuffer();
+    }
 }

@@ -18,29 +18,34 @@
  * Public License along with this library; If not, see
  * <http://www.gnu.org/licenses/>.
  */
-package tech.lity.rea.nectar.depthcam;
+package tech.lity.rea.nectar.camera;
 
 import processing.core.PApplet;
+import tech.lity.rea.nectar.calibration.HomographyCalibration;
 import tech.lity.rea.nectar.camera.Camera;
-import tech.lity.rea.nectar.camera.CameraOpenNI2;
+import tech.lity.rea.nectar.camera.CameraFactory;
+import tech.lity.rea.nectar.camera.CameraNectar;
+import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 import tech.lity.rea.nectar.camera.CannotCreateCameraException;
+import tech.lity.rea.nectar.depthcam.DepthCameraDevice;
+import tech.lity.rea.nectar.depthcam.DepthComputation;
+import tech.lity.rea.nectar.depthcam.OpenNIDepth;
 
 /**
  *
  * @author Jeremy Laviole
  */
-public final class OpenNI2 extends DepthCameraDevice {
+public final class NectarOpenNI extends DepthCameraDevice {
 
-    private final CameraOpenNI2 cameraNI;
+    private final CameraNectar cameraNectar;
 
-    public OpenNI2(PApplet parent, Camera anotherCam) throws CannotCreateCameraException {
+    public NectarOpenNI(PApplet parent, Camera anotherCam) throws CannotCreateCameraException {
         super(parent);
 
-        if (anotherCam instanceof CameraOpenNI2) {
-            this.camera = (CameraOpenNI2) anotherCam;
+        if (anotherCam instanceof CameraNectar) {
+            this.camera = (CameraNectar) anotherCam;
             this.camera.setUseDepth(true);
         } else {
-//            initDefaultCamera();
             this.anotherCamera = anotherCam;
         }
 
@@ -48,21 +53,12 @@ public final class OpenNI2 extends DepthCameraDevice {
             this.anotherCamera = getColorCamera();
         }
 
-        cameraNI = (CameraOpenNI2) camera;
-
-//        camera.getDepthCamera().setCalibration(Papart.AstraSDepthCalib);
-//        camera.getColorCamera().setCalibration(Papart.AstraSRGBCalib);
-//        setStereoCalibration(Papart.AstraSStereoCalib);
-
-//        setStereoCalibration(Papart.kinectStereoCalib);
-        // TODO: Hacks to try to handle the SR300 distorsions
-//        camera.getDepthCamera().setCalibration(Papart.SR300IRCalib);
-//        camera.getIRCamera().setCalibration(Papart.SR300IRCalib);
+        cameraNectar = (CameraNectar) camera;
     }
 
     @Override
-    public CameraOpenNI2 getMainCamera() {
-        return cameraNI;
+    public CameraNectar getMainCamera() {
+        return cameraNectar;
     }
 
     @Override
@@ -72,7 +68,7 @@ public final class OpenNI2 extends DepthCameraDevice {
 
     @Override
     public Camera.Type type() {
-        return Camera.Type.OPENNI2;
+        return Camera.Type.NECTAR;
     }
 
     @Override

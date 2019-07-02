@@ -14,7 +14,7 @@ import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 
 import processing.data.JSONObject;
-import tech.lity.rea.nectar.apps.NectarApplication;
+import tech.lity.rea.nectar.utils.NectarApplication;
 
 /**
  *
@@ -242,6 +242,11 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 
     private void sendColorImage() {
         ByteBuffer byteBuffer;
+        
+//        byteBuffer = dcamera.getColorCamera().getIplImage();
+//        IplImage smaller = dcamera.getColorCamera().getIplImage().sc
+        
+        
         if (useDepth) {
             if (dcamera.getColorCamera().getIplImage() == null) {
                 log("null color Image -d", "");
@@ -319,7 +324,9 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
                 redisDepth.publish(id, imageInfo.toString().getBytes());
                 log("Sending (PUBLISH) image to: " + name, "");
             }
+
         }
+
     }
 
     public long time() {

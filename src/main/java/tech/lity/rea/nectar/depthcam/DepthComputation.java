@@ -20,11 +20,19 @@
  */
 package tech.lity.rea.nectar.depthcam;
 
+import org.bytedeco.javacpp.opencv_core;
+
 /**
  * Abstraction for finding depth for each device.
+ *
  * @author Jeremy Laviole
  */
 public interface DepthComputation {
 
-    public float findDepth(int offset, Object buffer);
+    public static final float INVALID_DEPTH = -1;
+//    public float findDepth(int offset, Object buffer);
+
+    public float findDepth(int offset);
+
+    public void updateDepth(opencv_core.IplImage buffer);
 }

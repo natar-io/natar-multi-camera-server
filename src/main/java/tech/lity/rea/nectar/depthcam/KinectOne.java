@@ -67,33 +67,32 @@ public final class KinectOne extends DepthCameraDevice {
         // Nothing here yet. maybe get calibrations ?
     }
 
-//    @Override
-//    public DepthAnalysis.DepthComputation createDepthComputation() {
-//        return new KinectOneDepth();
-//    }
-//
-//    public class KinectOneDepth implements DepthAnalysis.DepthComputation {
-//
-//        public static final float KINECT_ONE_DEPTH_RATIO = 10f;
-//
-//        byte[] depthRaw;
-//
-//        public KinectOneDepth() {
-//            depthRaw = new byte[rawDepthSize()];
-//        }
-//
-//        @Override
-//        public float findDepth(int offset) {
-//            float d = (depthRaw[offset * 3 + 1] & 0xFF) * 256
-//                    + (depthRaw[offset * 3] & 0xFF);
-//
-//            return d / KINECT_ONE_DEPTH_RATIO; // / 65535f * 10000f;
-//        }
-//
-//        @Override
-//        public void updateDepth(opencv_core.IplImage depthImage) {
-//            depthImage.getByteBuffer().get(depthRaw);
-//        }
-//    }
+    @Override
+    public DepthComputation createDepthComputation() {
+        return new KinectOneDepth();
+    }
+      public class KinectOneDepth implements DepthComputation {
+
+        public static final float KINECT_ONE_DEPTH_RATIO = 10f;
+
+        byte[] depthRaw;
+
+        public KinectOneDepth() {
+            depthRaw = new byte[rawDepthSize()];
+        }
+
+        @Override
+        public float findDepth(int offset) {
+            float d = (depthRaw[offset * 3 + 1] & 0xFF) * 256
+                    + (depthRaw[offset * 3] & 0xFF);
+
+            return d / KINECT_ONE_DEPTH_RATIO; // / 65535f * 10000f;
+        }
+
+        @Override
+        public void updateDepth(opencv_core.IplImage depthImage) {
+            depthImage.getByteBuffer().get(depthRaw);
+        }
+    }
 
 }

@@ -27,6 +27,7 @@ import tech.lity.rea.nectar.camera.Camera;
 import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
 import tech.lity.rea.nectar.camera.SubCamera;
 import tech.lity.rea.nectar.camera.SubDepthCamera;
+import toxi.geom.Vec3D;
 
 /**
  *
@@ -52,7 +53,8 @@ public abstract class DepthCameraDevice {
     }
 
     public abstract void loadDataFromDevice();
-//    public abstract DepthAnalysis.DepthComputation createDepthComputation();
+    
+    public abstract DepthComputation createDepthComputation();
     
     public CameraRGBIRDepth getMainCamera() {
         return camera;
@@ -95,9 +97,9 @@ public abstract class DepthCameraDevice {
         camera.close();
     }
 
-//    public void setTouch(DepthTouchInput kinectTouchInput) {
-//        camera.getDepthCamera().setTouchInput(kinectTouchInput);
-//    }
+    public void setTouch(Object kinectTouchInput) {
+        camera.getDepthCamera().setTouchInput(kinectTouchInput);
+    }
 
 //    public void setStereoCalibration(String fileName) {
 //        HomographyCalibration calib = new HomographyCalibration();
@@ -124,29 +126,31 @@ public abstract class DepthCameraDevice {
     public PMatrix3D getStereoCalibrationInv() {
         return KinectRGBIRCalibrationInv;
     }
+    
 
-//    public int findMainImageOffset(Vec3D v) {
-//        return findMainImageOffset(v.x, v.y, v.z);
-//    }
-//
-//    public int findMainImageOffset(PVector v) {
-//        return findMainImageOffset(v.x, v.y, v.z);
-//    }
-//    
-//    public int findColorOffset(Vec3D v) {
-//        return findColorOffset(v.x, v.y, v.z);
-//    }
-//
-//    public int findColorOffset(PVector v) {
-//        return findColorOffset(v.x, v.y, v.z);
-//    }
-//    
-//    public int findDepthOffset(PVector v) {
-//        return findDepthOffset(v.x, v.y, v.z);
-//    }
-//    public int findDepthOffset(Vec3D v) {
-//        return findDepthOffset(v.x, v.y, v.z);
-//    }
+    public int findMainImageOffset(Vec3D v) {
+        return findMainImageOffset(v.x, v.y, v.z);
+    }
+
+    public int findMainImageOffset(PVector v) {
+        return findMainImageOffset(v.x, v.y, v.z);
+    }
+
+    public int findColorOffset(Vec3D v) {
+        return findColorOffset(v.x, v.y, v.z);
+    }
+
+    public int findColorOffset(PVector v) {
+        return findColorOffset(v.x, v.y, v.z);
+    }
+
+    public int findDepthOffset(PVector v) {
+        return findDepthOffset(v.x, v.y, v.z);
+    }
+
+    public int findDepthOffset(Vec3D v) {
+        return findDepthOffset(v.x, v.y, v.z);
+    }
 
     private PVector vt = new PVector();
     private PVector vt2 = new PVector();
@@ -160,37 +164,37 @@ public abstract class DepthCameraDevice {
      * @param z
      * @return
      */
-//    public int findColorOffset(float x, float y, float z) {
-//        vt.set(x, y, z);
-//        vt2.set(0, 0, 0);
-//        //  Ideally use a calibration... 
-////        kinectCalibRGB.getExtrinsics().mult(vt, vt2);       
-//        getStereoCalibration().mult(vt, vt2);
-//        return getColorCamera().getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
-//    }
-    
-//    /**
-//     * Warning not thread safe.
-//     *
-//     * @param x
-//     * @param y
-//     * @param z
-//     * @return
-//     */
-//    public int findMainImageOffset(float x, float y, float z) {
-//        vt.set(x, y, z);
-//        vt2.set(0, 0, 0);
-//        //  Ideally use a calibration... 
-////        kinectCalibRGB.getExtrinsics().mult(vt, vt2);       
-//        getStereoCalibration().mult(vt, vt2);
-//
-//        // TODO: find a solution for this...
-//        return getMainCamera().getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
-////        return getColorCamera.getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
-//    }
-//
-//    private int findDepthOffset(float x, float y, float z) {
-//        return getDepthCamera().getProjectiveDevice().worldToPixel(x,y,z);
-//    }
+    public int findColorOffset(float x, float y, float z) {
+        vt.set(x, y, z);
+        vt2.set(0, 0, 0);
+        //  Ideally use a calibration... 
+//        kinectCalibRGB.getExtrinsics().mult(vt, vt2);       
+        getStereoCalibration().mult(vt, vt2);
+        return getColorCamera().getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
+    }
 
+    /**
+     * Warning not thread safe.
+     *
+     * @param x
+     * @param y
+     * @param z
+     * @return
+     */
+    public int findMainImageOffset(float x, float y, float z) {
+        vt.set(x, y, z);
+        vt2.set(0, 0, 0);
+        //  Ideally use a calibration... 
+//        kinectCalibRGB.getExtrinsics().mult(vt, vt2);       
+        getStereoCalibration().mult(vt, vt2);
+
+        // TODO: find a solution for this...
+        return getMainCamera().getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
+//        return getColorCamera.getProjectiveDevice().worldToPixel(vt2.x, vt2.y, vt2.z);
+    }
+
+    private int findDepthOffset(float x, float y, float z) {
+        return getDepthCamera().getProjectiveDevice().worldToPixel(x, y, z);
+    }
+    
 }

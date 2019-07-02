@@ -72,30 +72,32 @@ public class Kinect360 extends DepthCameraDevice {
         // Nothing here yet. maybe get calibrations ?
     }
 
-//    @Override
-//    public DepthAnalysis.DepthComputation createDepthComputation() {
-//        return new Kinect360Depth();
-//    }
-//
-//    public class Kinect360Depth implements DepthAnalysis.DepthComputation {
-//
-//        byte[] depthRaw;
-//
-//        public Kinect360Depth() {
-//            depthRaw = new byte[rawDepthSize()];
-//        }
-//
-//        @Override
-//        public float findDepth(int offset) {
-//            float d = (depthRaw[offset * 2] & 0xFF) << 8
-//                    | (depthRaw[offset * 2 + 1] & 0xFF);
-//
-//            return d;
-//        }
-//
-//        @Override
-//        public void updateDepth(IplImage depthImage) {
-//            depthImage.getByteBuffer().get(depthRaw);
-//        }
-//    }
+    @Override
+    public DepthComputation createDepthComputation() {
+        return new Kinect360Depth();
+    }
+
+    class Kinect360Depth implements DepthComputation {
+
+        byte[] depthRaw;
+
+        public Kinect360Depth() {
+            depthRaw = new byte[rawDepthSize()];
+        }
+
+        @Override
+        public float findDepth(int offset) {
+            float d = (depthRaw[offset * 2] & 0xFF) << 8
+                    | (depthRaw[offset * 2 + 1] & 0xFF);
+
+            return d;
+        }
+
+        @Override
+        public void updateDepth(IplImage depthImage) {
+            depthImage.getByteBuffer().get(depthRaw);
+        }
+
+    }
+
 }

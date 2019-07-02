@@ -78,31 +78,30 @@ public final class RealSense extends DepthCameraDevice {
         setStereoCalibration(cameraRS.getHardwareExtrinsics());
     }
 
-//    @Override
-//    public DepthAnalysis.DepthComputation createDepthComputation() {
-//        return new RealSenseDepth();
-//    }
+    @Override
+    public DepthComputation createDepthComputation() {
+        return new RealSenseDepth();
+    }
+    
+     protected class RealSenseDepth implements DepthComputation {
 
-//    protected class RealSenseDepth implements DepthAnalysis.DepthComputation {
-//
-//        private final float depthRatio;
-//        private ShortBuffer depthRawShortBuffer;
-//
-//        public RealSenseDepth() {
-//            this.depthRatio = cameraRS.getDepthScale();
-//        }
-//
-//        @Override
-//        public float findDepth(int offset) {
-//            float d = depthRawShortBuffer.get(offset) * depthRatio * 1000f;
-//            return d;
-//        }
-//
-//        @Override
-//        public void updateDepth(opencv_core.IplImage depthImage) {
-//            ByteBuffer depthRawBuffer = depthImage.getByteBuffer();
-//            depthRawShortBuffer = depthRawBuffer.asShortBuffer();
-//        }
-//    }
+        private final float depthRatio;
+        private ShortBuffer depthRawShortBuffer;
+
+        public RealSenseDepth() {
+            this.depthRatio = cameraRS.getDepthScale();
+        }
+
+        @Override
+        public float findDepth(int offset) {
+            float d = depthRawShortBuffer.get(offset) * depthRatio * 1000f;
+            return d;
+        }
+
+        public void updateDepth(opencv_core.IplImage depthImage) {
+            ByteBuffer depthRawBuffer = depthImage.getByteBuffer();
+            depthRawShortBuffer = depthRawBuffer.asShortBuffer();
+        }
+    }
 
 }
