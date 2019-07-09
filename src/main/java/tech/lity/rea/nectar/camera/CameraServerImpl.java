@@ -2,6 +2,8 @@ package tech.lity.rea.nectar.camera;
 
 import processing.core.*;
 import java.nio.ByteBuffer;
+import java.util.Observable;
+import java.util.Observer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -9,18 +11,18 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
-import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.ParseException;
 import redis.clients.jedis.Jedis;
 
 import processing.data.JSONObject;
 import tech.lity.rea.nectar.utils.NectarApplication;
+import static tech.lity.rea.nectar.utils.NectarApplication.log;
 
 /**
  *
  * @author Jeremy Laviole, <laviole@rea.lity.tech>
  */
-public class CameraServerImpl extends NectarApplication implements CameraServer, Runnable {
+public class CameraServerImpl extends NectarApplication implements Runnable {
 
     Jedis redis, redisDepth, redisSend;
     Camera camera;
@@ -51,15 +53,25 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         redis = connectRedis();
         redisDepth = connectRedis();
 
+        RedisClientImpl redisClient = new RedisClientImpl();
+        redisClient.setRedisHost(host);
+        redisClient.setRedisPort(Integer.parseInt(port));
+        redisClient.setRedisAuth("");
+        
         try {
             // application only using a camera
             // screen rendering
 //            camera = CameraFactory.createCamera(Camera.Type.OPENCV, "0", "");
             camera = CameraFactory.createCamera(type, description, format);
             camera.setSize(width, height);
+            System.out.println("Start camera");
 
+            boolean simpleCam = true;
             if (useDepth) {
                 if (camera instanceof CameraRGBIRDepth) {
+
+                    System.out.println("Start OpenNI depth camera");
+
                     dcamera = (CameraRGBIRDepth) camera;
                     dcamera.setUseColor(true);
                     dcamera.setUseDepth(true);
@@ -69,8 +81,11 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
                             dcamera.getDepthCamera().height(),
                             2, 1);
 
+//                    dcamera.getColorCamera().addObserver(new ImageObserver());
+//                    dcamera.getDepthCamera().addObserver(new DepthImageObserver());
                     dcamera.actAsColorCamera();
 
+                    simpleCam = false;
                 } else {
                     die("Camera not recognized as a depth camera.");
                 }
@@ -78,8 +93,12 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 
             if (camera instanceof CameraOpenNI2) {
                 CameraOpenNI2 cameraNI = (CameraOpenNI2) camera;
-                cameraNI.sendToRedis(this, host, Integer.parseInt(port));
+                cameraNI.sendToRedis(redisClient, output, output + ":depth");
             }
+
+//            if (simpleCam) {
+//                camera.addObserver(new ImageObserver());
+//            }
 
             camera.start();
             sendParams(camera);
@@ -94,12 +113,10 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
 
     }
 
-    
-    @Override
-    public Jedis createRedisConnection(){
+    public Jedis createRedisConnection() {
         return connectRedis();
     }
-    
+
     private static Options options;
 
     private String buildDriverNames() {
@@ -171,15 +188,6 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
         }
 
     }
-    
-    public static void die(String why, boolean usage) {
-        if (usage) {
-            HelpFormatter formatter = new HelpFormatter();
-            formatter.printHelp("CameraServer", options);
-        }
-        System.out.println(why);
-        System.exit(-1);
-    }
 
     private void sendParams(Camera cam) {
         redis.set(output + ":width", Integer.toString(cam.width()));
@@ -217,36 +225,51 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
     }
 
     int lastTime = 0;
+//
+//    class ImageObserver implements Observer {
+//
+//        @Override
+//        public void update(Observable o, Object o1) {
+//            sendColorImage();
+//        }
+//    }
+//
+//    class DepthImageObserver implements Observer {
+//
+//        @Override
+//        public void update(Observable o, Object o1) {
+//            log("", "New Depth Image.");
+//            sendDepthImage();
+//        }
+//    }
 
     public void sendImage() {
         if (camera != null) {
-
-            // OpenNI2 camera is not grabbed here
+//            // OpenNI2 camera is not grabbed here
             if (camera instanceof CameraOpenNI2) {
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(100);
                     return;
                 } catch (InterruptedException ex) {
                     Logger.getLogger(CameraServerImpl.class.getName()).log(Level.SEVERE, null, ex);
                 }
-            }
+            } else {
+                // warning, some cameras do not grab ?
+                camera.grab();
 
-            // warning, some cameras do not grab ?
-            camera.grab();
-            sendColorImage();
-            if (useDepth) {
-                sendDepthImage();
+                sendColorImage();
+                if (useDepth) {
+                    sendDepthImage();
+                }
             }
         }
     }
 
     private void sendColorImage() {
         ByteBuffer byteBuffer;
-        
+
 //        byteBuffer = dcamera.getColorCamera().getIplImage();
 //        IplImage smaller = dcamera.getColorCamera().getIplImage().sc
-        
-        
         if (useDepth) {
             if (dcamera.getColorCamera().getIplImage() == null) {
                 log("null color Image -d", "");
@@ -339,12 +362,12 @@ public class CameraServerImpl extends NectarApplication implements CameraServer,
     static public void main(String[] passedArgs) {
 
         CameraServerImpl cameraServer = new CameraServerImpl(passedArgs);
+        System.out.println("Start in main Thread...");
         new Thread(cameraServer).start();
     }
 
     public String getOutput() {
         return this.output;
     }
-
 
 }

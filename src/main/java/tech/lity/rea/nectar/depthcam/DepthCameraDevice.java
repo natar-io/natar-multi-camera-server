@@ -25,6 +25,7 @@ import processing.core.PMatrix3D;
 import processing.core.PVector;
 import tech.lity.rea.nectar.camera.Camera;
 import tech.lity.rea.nectar.camera.CameraRGBIRDepth;
+import tech.lity.rea.nectar.camera.LockedUpdater;
 import tech.lity.rea.nectar.camera.SubCamera;
 import tech.lity.rea.nectar.camera.SubDepthCamera;
 import toxi.geom.Vec3D;
@@ -97,8 +98,8 @@ public abstract class DepthCameraDevice {
         camera.close();
     }
 
-    public void setTouch(Object kinectTouchInput) {
-        camera.getDepthCamera().setTouchInput(kinectTouchInput);
+    public void setTouch(LockedUpdater touchInput) {
+        camera.getDepthCamera().setTouchInput(touchInput);
     }
 
 //    public void setStereoCalibration(String fileName) {

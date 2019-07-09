@@ -19,13 +19,6 @@
  */
 package tech.lity.rea.nectar.camera;
 
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.api.sync.RedisCommands;
-import io.lettuce.core.codec.ByteArrayCodec;
-import io.lettuce.core.codec.RedisCodec;
-import io.lettuce.core.pubsub.StatefulRedisPubSubConnection;
-import io.lettuce.core.pubsub.api.sync.RedisPubSubCommands;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.bytedeco.javacv.FrameGrabber;
@@ -183,6 +176,13 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
 //            return;
 //        }
 //        ((WithTouchInput) depthCamera).newTouchImage();
+
+        try {
+            Thread.sleep((long) 30);
+        } catch (InterruptedException ex) {
+            Logger.getLogger(CameraOpenNI2.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
     }
 
     // WARNING, in thread  it does not wait for a new image ?
@@ -190,8 +190,8 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
     public void grabColor() {
         try {
 //            System.out.println("Sleeping color cam");
-            Thread.sleep((long) ((1.0f / (float) colorCamera.frameRate) * 1000f));
-//            Thread.sleep((long) ((1.0f / (float) colorCamera.frameRate) * 5000f));
+//            Thread.sleep((long) ((1.0f / (float) colorCamera.frameRate) * 100f));
+            Thread.sleep((long) 30);
 //            System.out.println("awake color cam");
         } catch (InterruptedException ex) {
             Logger.getLogger(CameraOpenNI2.class.getName()).log(Level.SEVERE, null, ex);
@@ -312,76 +312,27 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
         gray16Buffer.rewind();
     }
 
-    CameraServer server;
     Jedis redis;
-//    RedisConnection redis;
-    StatefulRedisConnection<byte[], byte[]> getSet;
-    StatefulRedisPubSubConnection<byte[], byte[]> pubsub;
-    RedisCommands<byte[], byte[]> getSetSync;
-    RedisPubSubCommands<byte[], byte[]> pubsubSync;
-
     RedisClient client;
-
-    public void sendToRedis(CameraServer camServer, String host, int port) {
-        server = camServer;
+    VideoEmitter colorVideoEmitter;
+    VideoEmitter depthVideoEmitter;
+    int time = 0;
+    
+    public void sendToRedis(RedisClient client, String keyColor, String keyDepth) {
+        this.client = client;
+        colorVideoEmitter = new VideoEmitter(client, keyColor);
+        depthVideoEmitter = new VideoEmitter(client, keyDepth);
 //        this.redis = redis;
-
-//        client = RedisClient.create("redis://localhost");
-        client = RedisClient.create("redis://" + host + ":" + Integer.toString(port)); 
-//        StatefulRedisConnection<String, String> connection = client.connect();
-//        RedisStringCommands sync = connection.sync();
-//        String value = (String) sync.get("key");
-        ByteArrayCodec codec = io.lettuce.core.codec.ByteArrayCodec.INSTANCE;
-
-        getSet = client.connect(codec);
-        getSetSync = getSet.sync();
-        pubsub = client.connectPubSub(codec);
-        pubsubSync = pubsub.sync();
     }
 
     protected void sendColor(byte[] imageData) {
         colorImageCount++;
-        byte[] id = server.getOutput().getBytes();
-        JSONObject imageInfo = new JSONObject();
-        imageInfo.setLong("timestamp", server.time());
-        imageInfo.setLong("imageCount", colorImageCount);
-        try {
-            
-            getSetSync.set(id, imageData);
-            pubsubSync.publish(id, imageInfo.toString().getBytes());
-            
-//            redis.set(id, imageData);
-//            redis.publish(id, imageInfo.toString().getBytes());
-        } catch (Exception e) {
-            System.out.println("Sending: " + server.getOutput() + " : " + imageInfo.toString());
-            System.out.println("Exception: " + e);
-            e.printStackTrace();
-            redis = server.createRedisConnection();
-        }
+        colorVideoEmitter.sendRawImage(imageData, time++);
     }
 
     protected void sendDepth(byte[] imageData) {
         depthImageCount++;
-        String name = server.getOutput() + ":depth:raw";
-        byte[] id = (name).getBytes();
-
-        JSONObject imageInfo = new JSONObject();
-        imageInfo.setLong("timestamp", server.time());
-        imageInfo.setLong("imageCount", depthImageCount);
-
-        try {
-                 getSetSync.set(id, imageData);
-            pubsubSync.publish(id, imageInfo.toString().getBytes());
-            
-            
-//            redis.set(id, imageData);
-//            redis.publish(id, imageInfo.toString().getBytes());
-        } catch (Exception e) {
-            System.out.println("Exception: " + e);
-            e.printStackTrace();
-            redis = server.createRedisConnection();
-        }
-
+        depthVideoEmitter.sendRawImage(imageData, time++);
     }
 
     class FrameListener implements VideoStream.NewFrameListener {
@@ -436,7 +387,7 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
                 frameData.get(frameDataBytes);
 
                 // Juste forward the bytes if on server... 
-                if (server != null) {
+                if (colorVideoEmitter != null) {
                     sendColor(frameDataBytes);
                     return;
                 }
@@ -462,7 +413,7 @@ public class CameraOpenNI2 extends CameraRGBIRDepth {
                 byte[] frameDataBytes = new byte[frameSize];
                 frameData.get(frameDataBytes);
 
-                if (server != null) {
+                if (depthVideoEmitter != null) {
                     sendDepth(frameDataBytes);
                     return;
                 }

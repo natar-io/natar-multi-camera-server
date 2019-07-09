@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>tech.lity.rea</groupId>
     <artifactId>natar-multi-camera-server</artifactId>
-    <version>0.1.2b</version>
+    <version>0.1.2c</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -67,7 +67,7 @@
         <dependency>
             <groupId>tech.lity.rea</groupId>
             <artifactId>natar-core</artifactId>
-            <version>0.1.2a-SNAPSHOT</version>
+            <version>0.1.2c</version>
         </dependency>
 
         <dependency>
