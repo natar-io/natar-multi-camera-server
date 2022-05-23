@@ -1,6 +1,8 @@
-## Nectar camera server 
+## Nectar camera server
 
 First camera server from PapARt project.
+
+## Deprecated in PapARt 1.6
 
 
 ## How to use
@@ -13,10 +15,10 @@ First camera server from PapARt project.
 
 ```
 ## OpenCV camera
-java -jar -Xmx64m target/nectar-camera-server-0.1-SNAPSHOT-jar-with-dependencies.jar --driver OPENCV --device-id 0 --format rgb --output camera0 --resolution 640x480 --stream --stream-set --depth-camera camera0:depth" 
+java -jar -Xmx64m target/nectar-camera-server-0.1-SNAPSHOT-jar-with-dependencies.jar --driver OPENCV --device-id 0 --format rgb --output camera0 --resolution 640x480 --stream --stream-set --depth-camera camera0:depth"
 
-## Depth camera 
-java -jar -Xmx64m target/nectar-camera-server-0.1-SNAPSHOT-jar-with-dependencies.jar --driver OPENNI2 --device-id 0 --format rgb --output camera0 --resolution 640x480 --stream --depth-camera camera0:depth" 
+## Depth camera
+java -jar -Xmx64m target/nectar-camera-server-0.1-SNAPSHOT-jar-with-dependencies.jar --driver OPENNI2 --device-id 0 --format rgb --output camera0 --resolution 640x480 --stream --depth-camera camera0:depth"
 
 ## Play a video
 java -jar -Xmx64m target/nectar-camera-server-0.1-SNAPSHOT-jar-with-dependencies.jar --driver FFMPEG --device-id "/home/ditrop/Documents/chat-fr.mp4" --format video --output video0	--stream --stream-set
